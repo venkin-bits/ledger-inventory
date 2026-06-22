@@ -8,10 +8,15 @@
 
 import { supabaseAdmin as supabase } from '@/lib/supabaseAdmin'
 
+// TODO: replace with real admin email from profiles table later.
+const ADMIN_TEST_EMAIL = 'venkat.jeeva2156@gmail.com'
+
+const RESEND_FROM_EMAIL = 'Ledger Inventory <onboarding@resend.dev>'
+
 /**
  * After a stock movement, call this with the product ID.
  * It checks current_stock vs low_stock_threshold.
- * If stock is low, it calls the Resend email function (Phase 3).
+ * If stock is low, it sends an email through Resend.
  */
 export async function checkAndAlertIfLowStock(productId: string) {
   const { data: product, error } = await supabase
@@ -25,6 +30,37 @@ export async function checkAndAlertIfLowStock(productId: string) {
   const isLow = product.current_stock < product.low_stock_threshold
   if (!isLow) return
 
-  // TODO (Phase 3): call Resend to email the admin
-  console.log(`LOW STOCK ALERT: ${product.name} is at ${product.current_stock} units`)
+  const resendApiKey = process.env.RESEND_API_KEY
+
+  if (!resendApiKey) {
+    console.error('RESEND_API_KEY is missing from .env.local')
+    return
+  }
+
+  const subject = `Low stock alert: ${product.name}`
+  const text = [
+    `${product.name} is below its low-stock threshold.`,
+    '',
+    `Current stock: ${product.current_stock}`,
+    `Low-stock threshold: ${product.low_stock_threshold}`,
+  ].join('\n')
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: ADMIN_TEST_EMAIL,
+      subject,
+      text,
+    }),
+  })
+
+  if (!response.ok) {
+    const message = await response.text()
+    console.error(`Resend email failed: ${message}`)
+  }
 }
