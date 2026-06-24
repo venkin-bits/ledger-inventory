@@ -9,7 +9,7 @@
 import { supabaseAdmin as supabase } from '@/lib/supabaseAdmin'
 
 // TODO: replace with real admin email from profiles table later.
-const ADMIN_TEST_EMAIL = 'venkat.jeeva2156@gmail.com'
+const ADMIN_TEST_EMAIL = 'inventory.4762@gmail.com'
 
 const RESEND_FROM_EMAIL = 'Ledger Inventory <onboarding@resend.dev>'
 
