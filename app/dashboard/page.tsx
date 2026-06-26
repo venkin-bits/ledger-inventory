@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import StockTable from '@/components/StockTable'
 import UpdateStockModal from '@/components/UpdateStockModal'
@@ -25,33 +25,55 @@ export default function DashboardPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
 
+  const fetchProducts = useCallback(async () => {
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('access_token') : null
+
+    if (!token) {
+      setError('Missing bearer token. Please log in first.')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/products', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load products')
+      }
+
+      const data = await response.json()
+      setProducts(data)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not load inventory data.'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   // Redirect to login if token is missing
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('access_token') : null
+
     if (!token) {
       router.push('/login')
       return
     }
-    setUserEmail(localStorage.getItem('user_email'))
-    fetchProducts()
-  }, [router])
 
-  const fetchProducts = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/products')
-      if (!response.ok) {
-        throw new Error('Failed to load products')
-      }
-      const data = await response.json()
-      setProducts(data)
-    } catch (err: any) {
-      setError(err.message || 'Could not load inventory data.')
-    } finally {
-      setLoading(false)
-    }
-  }
+    setUserEmail(window.localStorage.getItem('user_email'))
+
+    const timer = window.setTimeout(() => {
+      void fetchProducts()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [fetchProducts, router])
 
   const handleSignOut = () => {
     localStorage.removeItem('access_token')
@@ -104,8 +126,10 @@ export default function DashboardPage() {
         <StockTable products={products} onUpdateStock={handleUpdateStockClick} />
       )}
 
-      {/* Renders the modal overlay when a product is clicked.
-          We will implement the modal interior state in Step 3. */}
+      <a href="/api/reports/download" className="btn-secondary" style={{ textDecoration: 'none' }}>
+  Download PDF
+</a>
+
       {selectedProduct && (
         <UpdateStockModal
           product={selectedProduct}
